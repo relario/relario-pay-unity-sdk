@@ -1,0 +1,22 @@
+{
+  "name": "com.relario.pay",
+  "version": "1.0.0",
+  "displayName": "Relario Pay",
+  "description": "Relario Pay",
+  "unity": "2021.1",
+  "keywords": [
+    "Relario",
+    "Pay",
+    "Sms"
+  ],
+  "author": {
+    "name": "Relario",
+    "email": "support@relario.com",
+    "url": "https://relario.com"
+  },
+  "type": "library",
+  "dependencies": {
+    "com.unity.textmeshpro": "3.0.7",
+    "com.google.external-dependency-manager": "1.2.178"
+  }
+}
