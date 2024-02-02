@@ -23,7 +23,7 @@ Under `Packages/manifest.json`, add the following lines, then open the Unity Edi
 }
 ```
 
-Then you need to go to Package Manager (`Assets/View in Package Manager`) and import via git url.
+Then you need to go to Package Manager (`Assets > View in Package Manager`) and import via git url.
 
 
 ## Build
