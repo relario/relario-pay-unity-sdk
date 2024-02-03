@@ -35,8 +35,6 @@ namespace Relario
 
         // private Transaction transaction;
         private PayBySMS _payBySms;
-        private SubscriptionManager _subscriptionManager;
-
         private AndroidJavaClass _unityClass;
         private AndroidJavaObject _unityActivity;
         private AndroidJavaObject _applicationContext;

@@ -55,8 +55,6 @@ namespace Relario
 
         private DateTime lastRewardTime;
         private RelarioPay relarioPayment;
-        private Transaction partialTransaction;
-        private int _successfulTransfers;
         private const string PlayerPrefsKey = "subscriptionClaimTime";
         Coroutine periodicCoroutine;
         bool transactionInProgress = false;
