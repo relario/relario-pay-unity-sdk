@@ -9,17 +9,16 @@ namespace Relario
 
     public class SubscriptionTypeController : MonoBehaviour
     {
-        public SubscriptionManager subscriptionManager;
-        public Button skipDaysBtn; 
+        public RelarioPay subscriptionManager;
+        public Button skipDaysBtn;
         public TMP_Dropdown dropdown;
 
         private void Start()
         {
-            // if (PlayerPrefs.GetInt("Subscribed") == 1)
-            // {
-            //     dropdown.gameObject.SetActive(false);
-            // }else{
-            // }
+            if (!subscriptionManager)
+            {
+                subscriptionManager = FindObjectOfType<RelarioPay>();
+            }
             // Subscribe to the Dropdown's OnValueChanged event
             dropdown.onValueChanged.AddListener(OnDropdownValueChanged);
             skipDaysBtn.onClick.AddListener(SkipDays);
@@ -36,7 +35,7 @@ namespace Relario
 
         void SkipDays()
         {
-            subscriptionManager.SkipDays();
+            // subscriptionManager.SkipDays();
         }
     }
 }
