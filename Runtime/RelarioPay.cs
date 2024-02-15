@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using Relario.Network;
 using Relario.Network.Models;
@@ -34,9 +36,7 @@ namespace Relario
         private bool _isFocused;
 
         // private Transaction transaction;
-        private PayBySMS _payBySms;
-        private SubscriptionManager _subscriptionManager;
-
+        private PaymentManager _paymentManager;
         private AndroidJavaClass _unityClass;
         private AndroidJavaObject _unityActivity;
         private AndroidJavaObject _applicationContext;
@@ -51,7 +51,8 @@ namespace Relario
         {
 #if UNITY_ANDROID
             InitializePlugin("com.relario.subscription.SubscriptionManager");
-            _payBySms = new PayBySMS(_unityActivity, _pluginInstance);
+            _paymentManager = new PaymentManager(_unityActivity, _pluginInstance);
+            // SubscriptionManager = new SubscriptionManager(_unityActivity, _pluginInstance);
 #endif
         }
 
@@ -108,7 +109,7 @@ namespace Relario
             StartTransactionCheck(transactionId);
         }
 
-        public void StartTransactionCheck(string transactionId)
+        private void StartTransactionCheck(string transactionId)
         {
             _isChecking = true;
             _currentTransactionId = transactionId;
@@ -116,8 +117,7 @@ namespace Relario
             StartCoroutine(CheckTransactionUpdateCoroutine(transactionId));
         }
 
-
-        public void RequestSmsPermission(Action<PermissionStatus> callback)
+        private void RequestSmsPermission(Action<PermissionStatus> callback)
         {
             if (Permission.HasUserAuthorizedPermission(Utility.SMSPermission))
             {
@@ -133,7 +133,6 @@ namespace Relario
             Permission.RequestUserPermission(Utility.SMSPermission, permissionCallbacks);
         }
 
-
         public void Subscribe(SubscriptionOptions options)
         {
 #if UNITY_ANDROID
@@ -141,7 +140,8 @@ namespace Relario
             {
                 if (s == PermissionStatus.Granted)
                 {
-                    _pluginInstance.Call("subscribe", options.IntervalRate, options.TimeUnit.ToString(), options.SmsCount,
+                    _pluginInstance.Call("subscribe", options.IntervalRate, options.TimeUnit.ToString(),
+                        options.SmsCount,
                         options.ProductId, options.ProductName, options.CustomerId);
                 }
                 else
@@ -213,10 +213,10 @@ namespace Relario
 
                 StartCoroutine(PaymentHttpApi.CreateTransaction(apiKey, newTransaction, ((exception, transaction) =>
                 {
-                    callback(exception, transaction);
+                    callback?.Invoke(exception, transaction);
                     try
                     {
-                        _payBySms.Send(transaction, switchToSmsApp);
+                        _paymentManager.Send(transaction, switchToSmsApp);
                         StartTransactionCheck(transaction.transactionId);
                     }
                     catch (Exception err)
@@ -287,7 +287,66 @@ namespace Relario
             _currentTransactionId = null;
             _isChecking = false;
         }
-        
+
+
+        public List<Transaction> GetSubscriptionTransactions()
+        {
+            var transactionsJson = _pluginInstance.Call<string>("retrieveTransactions");
+            var wrappedArrayJson = JsonArrayResult<Transaction>.WrapJsonArray(transactionsJson);
+            var transactionsList =
+                JsonUtility.FromJson<JsonArrayResult<Transaction>>(wrappedArrayJson);
+            return new List<Transaction>(transactionsList.result);
+        }
+
+        public Transaction GetLastSubscriptionTransaction()
+        {
+            var transactions = GetSubscriptionTransactions();
+            var sortedTransactions = transactions.OrderBy(t => t.createdAt).ToList();
+            var lastTransaction = sortedTransactions.LastOrDefault();
+            return lastTransaction;
+        }
+
+
+        public void RetryTransaction(string transactionId, Action<Exception, Transaction> callback)
+        {
+            StartCoroutine(PaymentHttpApi.GetTransaction(apiKey, transactionId, (exception, transaction) =>
+            {
+                callback?.Invoke(exception, transaction);
+                RetryTransaction(transaction);
+            }));
+        }
+        public void RetryTransaction(Transaction transaction)
+        {
+            var requiredPayments = transaction.smsCount - transaction.payments.Count;
+            try
+            {
+                _paymentManager.Send(transaction, switchToSmsApp, requiredPayments);
+                StartTransactionCheck(transaction.transactionId);
+            }
+            catch (Exception err)
+            {
+                Debug.LogError(err);
+                OnFailedPay?.Invoke(err, null);
+            }
+        }
+
+        public void GetSmsPrices(Action<Exception, List<SMSPricing>> callback)
+        {
+            StartCoroutine(PaymentHttpApi.GetCurrentIP(ip =>
+                StartCoroutine(PaymentHttpApi.GetPrices(apiKey, ip, (exception, response) =>
+                {
+                    if (exception != null)
+                    {
+                        callback(exception, null);
+                        return;
+                    }
+
+                    callback(null, response.rates);
+                }))
+            ));
+        }
+
+
         private DateTime LoadLastRewardTime()
         {
             // Load the last reward time and subscription type from player prefs
@@ -300,7 +359,8 @@ namespace Relario
                 {
                     // Parse the saved data
                     DateTime savedTime = DateTime.Parse(dataParts[0]);
-                    SubscriptionType savedSubscriptionType = (SubscriptionType)Enum.Parse(typeof(SubscriptionType), dataParts[1]);
+                    SubscriptionType savedSubscriptionType =
+                        (SubscriptionType)Enum.Parse(typeof(SubscriptionType), dataParts[1]);
 
                     // Update the current subscription type
                     subscriptionType = savedSubscriptionType;
@@ -338,7 +398,7 @@ namespace Relario
         HOURS,
         DAYS
     }
-    
+
     public enum SubscriptionType
     {
         Daily,
@@ -404,6 +464,17 @@ namespace Relario
             OnSuccessfulPay = onSuccess;
             OnPartialPay = onPartial;
             OnFailedPay = onFailure;
+        }
+    }
+
+    [System.Serializable]
+    public class JsonArrayResult<T>
+    {
+        public T[] result;
+
+        public static string WrapJsonArray(string json)
+        {
+            return "{\"result\":" + json + "}";
         }
     }
 }

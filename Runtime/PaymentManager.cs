@@ -1,19 +1,21 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.Android;
 using Relario.Network.Models;
 
 namespace Relario
 {
-    public class PayBySMS
+    public class PaymentManager
     {
-        readonly AndroidJavaObject _currentActivity;
-        private AndroidJavaObject _pluginInstance;
+        private readonly AndroidJavaObject _currentActivity;
+        private readonly AndroidJavaObject _pluginInstance;
         private Transaction _transaction;
 
-        public PayBySMS(AndroidJavaObject unityActivity, AndroidJavaObject pluginInstance)
+        public PaymentManager(AndroidJavaObject unityActivity, AndroidJavaObject pluginInstance)
         {
 #if UNITY_ANDROID
 
@@ -22,7 +24,7 @@ namespace Relario
 #endif
         }
 
-        public void Send(Transaction transaction, bool switchToSmsApp)
+        public void Send(Transaction transaction, bool switchToSmsApp, int overrideSmsCount = 0)
         {
             if (Application.isEditor)
             {
@@ -31,13 +33,18 @@ namespace Relario
 
 #if UNITY_ANDROID
             Debug.LogWarning("[Relario] SMS Pay");
+            if (overrideSmsCount > 0 && overrideSmsCount <= transaction.smsCount)
+            {
+                transaction.phoneNumbersList = transaction.phoneNumbersList.Take(overrideSmsCount).ToList();
+            }
+
             this._transaction = transaction;
+
             // If switchToSmsApp is true, use SMSHandler to generate SMS URL
             if (switchToSmsApp)
             {
                 // Convert the List<string> to an array of strings
                 string[] phoneNumbersArray = transaction.phoneNumbersList.ToArray();
-
                 string smsUrl = Utility.GetClickToSmsUrl(phoneNumbersArray, transaction.smsBody);
                 Application.OpenURL(smsUrl);
             }
@@ -49,13 +56,13 @@ namespace Relario
 
                     pc.PermissionDenied += delegate(string str)
                     {
-                        RunAndroidUiThread(noPermissionToast);
-                        Send(transaction, switchToSmsApp);
+                        RunAndroidUiThread(NoPermissionToast);
+                        Send(transaction, true);
                     };
 
                     pc.PermissionDeniedAndDontAskAgain += delegate(string str)
                     {
-                        RunAndroidUiThread(noPermissionToast);
+                        RunAndroidUiThread(NoPermissionToast);
                     };
 
                     pc.PermissionGranted += delegate(string str) { RunAndroidUiThread(SendProcess); };
@@ -71,7 +78,7 @@ namespace Relario
 #endif
         }
 
-        void RunAndroidUiThread(Action action)
+        private void RunAndroidUiThread(Action action)
         {
             _currentActivity.Call("runOnUiThread", new AndroidJavaRunnable(action));
         }
@@ -95,7 +102,8 @@ namespace Relario
                 {
                     Debug.Log("Success: " + successCount + ", Failed: " + failedCount);
                 };
-                _pluginInstance.Call("sendSms", _transaction.phoneNumbersList.ToArray(), _transaction.smsBody, smsStatusCallback);
+                _pluginInstance.Call("sendSms", _transaction.phoneNumbersList.ToArray(), _transaction.smsBody,
+                    smsStatusCallback);
                 toastMessage = _transaction.phoneNumbersList.Count + "x SMS are delivering.";
             }
             catch (Exception e)
@@ -111,13 +119,13 @@ namespace Relario
         }
 
         // Helper function passed to RunAndroidUiThread which has no parameter, since showToast has one
-        void noPermissionToast()
+        private void NoPermissionToast()
         {
             Debug.Log("SMS permissions required");
             RequestPermissions();
         }
 
-        public void RequestPermissions()
+        private void RequestPermissions()
         {
             // Check if SMS permission is granted, and request it if not
             if (!Permission.HasUserAuthorizedPermission(Utility.SMSPermission))
@@ -130,7 +138,7 @@ namespace Relario
             // { Permission.RequestUserPermission(CallPermission); }
         }
 
-        void showToast(string message)
+        private void ShowToast(string message)
         {
             AndroidJavaObject context = _currentActivity.Call<AndroidJavaObject>("getApplicationContext");
             AndroidJavaClass Toast = new AndroidJavaClass("android.widget.Toast");

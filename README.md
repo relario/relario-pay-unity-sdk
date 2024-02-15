@@ -23,7 +23,7 @@ Under `Packages/manifest.json`, add the following lines, then open the Unity Edi
 }
 ```
 
-Then you need to go to Package Manager (`Assets > View in Package Manager`) and import via git url.
+Then you need to go to Package Manager (`Assets > View in Package Manager`) and import relarioPay SDK via git url.
 
 
 ## Build
@@ -83,5 +83,39 @@ Example:
         RelarioPay relarioPay = gameObject.AddComponent<RelarioPay>();
 
         relarioPay.CancelSubscription(productId: "test");
+    }
+```
+
+### Get Last Sent transaction in subscription
+```csharp
+    void Start()
+    {
+        RelarioPay relarioPay = gameObject.AddComponent<RelarioPay>();
+
+        var transaction = relarioPay.GetLastSubscriptionTransaction();
+    }
+```
+
+### Get all transactions since subscription started
+```csharp
+    void Start()
+    {
+        RelarioPay relarioPay = gameObject.AddComponent<RelarioPay>();
+
+        var transactions = relarioPay.GetSubscriptionTransactions();
+    }
+```
+
+### Retry a transaction
+```csharp
+    void Start()
+    {
+        RelarioPay relarioPay = gameObject.AddComponent<RelarioPay>();
+
+        var transaction = relarioPay.GetLastSubscriptionTransaction();
+        relarioPay.OnPartialPay = transaction => Debug.Log("Partial Pay");
+        relarioPay.OnFailedPay = (exception, transaction) => Debug.Log("Failed Pay");
+        relarioPay.OnSuccessfulPay = transaction => Debug.Log("Successful Pay");
+        _relarioPay.RetryTransaction(transaction);
     }
 ```
