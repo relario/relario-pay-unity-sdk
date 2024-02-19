@@ -304,6 +304,11 @@ namespace Relario
             return lastTransaction;
         }
 
+        public bool IsTransactionSuccessful(Transaction transaction)
+        {
+            return transaction.IsFullyPaid(minThresholdForSuccess);
+        }
+
 
         public void RetryTransaction(string transactionId, Action<Exception, Transaction> callback)
         {
@@ -313,6 +318,7 @@ namespace Relario
                 RetryTransaction(transaction);
             }));
         }
+
         public void RetryTransaction(Transaction transaction)
         {
             var requiredPayments = transaction.smsCount - transaction.payments.Count;
@@ -357,13 +363,6 @@ namespace Relario
         MINUTES,
         HOURS,
         DAYS
-    }
-
-    public enum SubscriptionType
-    {
-        Daily,
-        Weekly,
-        Monthly
     }
 
     public class SubscriptionOptions
