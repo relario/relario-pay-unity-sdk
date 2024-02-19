@@ -12,8 +12,6 @@ namespace Relario
 {
     public class RelarioPay : MonoBehaviour
     {
-        public SubscriptionType subscriptionType = SubscriptionType.Daily;
-
         public Action<Transaction> OnSuccessfulPay;
         public Action<Transaction> OnPartialPay;
         public Action<Exception, Transaction> OnFailedPay;
@@ -344,44 +342,6 @@ namespace Relario
                     callback(null, response.rates);
                 }))
             ));
-        }
-
-
-        private DateTime LoadLastRewardTime()
-        {
-            // Load the last reward time and subscription type from player prefs
-            if (PlayerPrefs.HasKey(PlayerPrefsKey))
-            {
-                string savedData = PlayerPrefs.GetString(PlayerPrefsKey);
-                string[] dataParts = savedData.Split('|');
-
-                if (dataParts.Length == 2)
-                {
-                    // Parse the saved data
-                    DateTime savedTime = DateTime.Parse(dataParts[0]);
-                    SubscriptionType savedSubscriptionType =
-                        (SubscriptionType)Enum.Parse(typeof(SubscriptionType), dataParts[1]);
-
-                    // Update the current subscription type
-                    subscriptionType = savedSubscriptionType;
-
-                    return savedTime;
-                }
-            }
-
-            // If not saved previously, return a default value based on debug mode
-            DateTime defaultTime = WorldTimeAPI.Instance.GetCurrentDateTime();
-            SaveLastRewardTime(defaultTime); // Save the default values
-
-            return defaultTime;
-        }
-
-        private void SaveLastRewardTime(DateTime time)
-        {
-            // Save the last reward time and subscription type to player prefs
-            string dataToSave = $"{time.ToString()}|{(int)subscriptionType}";
-            PlayerPrefs.SetString(PlayerPrefsKey, dataToSave);
-            PlayerPrefs.Save();
         }
     }
 
