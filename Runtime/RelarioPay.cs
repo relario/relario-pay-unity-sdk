@@ -115,7 +115,7 @@ namespace Relario
             StartCoroutine(CheckTransactionUpdateCoroutine(transactionId));
         }
 
-        private void RequestSmsPermission(Action<PermissionStatus> callback)
+        private static void RequestSmsPermission(Action<PermissionStatus> callback)
         {
             if (Permission.HasUserAuthorizedPermission(Utility.SMSPermission))
             {
@@ -165,17 +165,17 @@ namespace Relario
             string customerId,
             Action<Exception, Transaction> callback)
         {
-            InitiateTransaction(
+            StartCoroutine(InitiateTransaction(
                 smsCount,
                 productId,
                 productName,
                 customerId: customerId ?? Guid.NewGuid().ToString(),
                 null,
                 callback
-            );
+            ));
         }
 
-        private void InitiateTransaction(
+        private IEnumerator InitiateTransaction(
             int smsCount,
             string productId,
             string productName,
@@ -184,46 +184,61 @@ namespace Relario
             Action<Exception, Transaction> callback)
         {
             Debug.Log("[Relario] Initiating relario transaction.");
-            StartCoroutine(PaymentHttpApi.GetCurrentIP(ip =>
+            string ip = null;
+            yield return GetCurrentIP(result => ip = result);
+
+
+            Debug.Log("[Relario] Got external IP.");
+            Debug.Log("[Relario] Creating transaction body for " + PaymentType.sms);
+
+            var newTransaction = new NewTransactionBody(
+                smsCount,
+                productId,
+                productName,
+                customerIpAddress: ip,
+                customerMccMnc,
+                customerId
+            );
+
+            Debug.Log("[Relario] Creating transaction body: " + newTransaction.ToJson());
+            var validationMsg = newTransaction.Validate();
+            if (validationMsg != null)
             {
-                Debug.Log("[Relario] Got external IP.");
-                Debug.Log("[Relario] Creating transaction body for " + PaymentType.sms);
+                var exception =
+                    new Exception("[Relario] NewTransactionBody validation failed: " + validationMsg);
+                Debug.LogError(exception);
+                callback?.Invoke(exception, null);
+                yield break;
+            }
 
-                var newTransaction = new NewTransactionBody(
-                    smsCount,
-                    productId,
-                    productName,
-                    customerIpAddress: ip,
-                    customerMccMnc,
-                    customerId
-                );
+            Transaction transaction = null;
+            yield return CreateTransaction(apiKey, newTransaction, (exception, result) =>
+            {
+                transaction = result;
+                callback?.Invoke(exception, result);
+            });
 
-                Debug.Log("[Relario] Creating transaction body: " + newTransaction.ToJson());
-                var validationMsg = newTransaction.Validate();
-                if (validationMsg != null)
-                {
-                    var exception =
-                        new Exception("[Relario] NewTransactionBody validation failed: " + validationMsg);
-                    Debug.LogError(exception);
-                    callback?.Invoke(exception, null);
-                    return;
-                }
+            try
+            {
+                _paymentManager.Send(transaction, switchToSmsApp);
+                StartTransactionCheck(transaction.transactionId);
+            }
+            catch (Exception err)
+            {
+                Debug.LogError(err);
+                OnFailedPay?.Invoke(err, null);
+            }
+        }
 
-                StartCoroutine(PaymentHttpApi.CreateTransaction(apiKey, newTransaction, ((exception, transaction) =>
-                {
-                    callback?.Invoke(exception, transaction);
-                    try
-                    {
-                        _paymentManager.Send(transaction, switchToSmsApp);
-                        StartTransactionCheck(transaction.transactionId);
-                    }
-                    catch (Exception err)
-                    {
-                        Debug.LogError(err);
-                        OnFailedPay?.Invoke(err, null);
-                    }
-                })));
-            }));
+        private IEnumerator GetCurrentIP(Action<string> callback)
+        {
+            yield return PaymentHttpApi.GetCurrentIP(callback);
+        }
+
+        private IEnumerator CreateTransaction(string apiKey, NewTransactionBody newTransaction,
+            Action<Exception, Transaction> callback)
+        {
+            yield return PaymentHttpApi.CreateTransaction(apiKey, newTransaction, callback);
         }
 
         private IEnumerator CheckTransactionUpdateCoroutine(
