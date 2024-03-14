@@ -60,7 +60,7 @@ namespace Relario
             _unityActivity = _unityClass.GetStatic<AndroidJavaObject>("currentActivity");
             _applicationContext = _unityActivity.Call<AndroidJavaObject>("getApplicationContext");
             _pluginInstance =
-                new AndroidJavaObject(pluginName, _applicationContext, "6c0da5e46c7a42aaa33e0aa28545475d");
+                new AndroidJavaObject(pluginName, _applicationContext, apiKey);
             if (_pluginInstance == null)
             {
                 Debug.Log("Plugin Instance Error");
