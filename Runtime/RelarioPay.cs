@@ -115,7 +115,7 @@ namespace Relario
             StartCoroutine(CheckTransactionUpdateCoroutine(transactionId));
         }
 
-        private static void RequestSmsPermission(Action<PermissionStatus> callback)
+        private void RequestSmsPermission(Action<PermissionStatus> callback)
         {
             if (Permission.HasUserAuthorizedPermission(Utility.SMSPermission))
             {
