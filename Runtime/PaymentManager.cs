@@ -108,11 +108,9 @@ namespace Relario
             }
             catch (Exception e)
             {
-                Debug.Log("Error");
-                toastMessage = "Failed to send SMS.";
+                Debug.Log("Error" + e.Message);
                 // Debug.Log(toastMessage);
-
-                throw e;
+                throw;
             }
 
             Debug.Log(toastMessage);
